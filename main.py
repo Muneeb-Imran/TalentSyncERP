@@ -62,12 +62,12 @@ def get_dashboard_analytics(peer_weight: float = 0.4, manager_weight: float = 0.
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # JOIN the tables to get the Name, Role, and Retention Risk alongside the scores
+        # This JOIN connects the new names/roles with their appraisal scores
         cursor.execute('''
             SELECT c.employeeid, c.fullname, c.jobrole, c.retentionriskscore, 
                    p.peerfeedbackscore, p.managerfeedbackscore, p.trainingrecommended 
-            FROM Consultants c
-            LEFT JOIN PerformanceAppraisals p ON c.employeeid = p.employeeid;
+            FROM consultants c
+            LEFT JOIN performanceappraisals p ON c.employeeid = p.employeeid;
         ''')
         rows = cursor.fetchall()
         
@@ -78,13 +78,14 @@ def get_dashboard_analytics(peer_weight: float = 0.4, manager_weight: float = 0.
         for row in rows:
             emp_id, name, role, risk_score, peer, manager, training = row
             
-            # Handle empty values just in case an employee hasn't been reviewed yet
+            # Fallbacks just in case data is missing
             peer = peer or 0
             manager = manager or 0
             risk_score = risk_score or 0.0
             
             final_score = (peer * peer_weight) + (manager * manager_weight)
             
+            # Sending the EXACT variable names the Vercel frontend is looking for
             team_data.append({
                 "employee_id": emp_id,
                 "name": name,
@@ -96,4 +97,5 @@ def get_dashboard_analytics(peer_weight: float = 0.4, manager_weight: float = 0.
             
         return {"team_analytics": team_data}
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
