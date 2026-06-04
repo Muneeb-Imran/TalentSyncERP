@@ -56,3 +56,44 @@ def get_performance_review(employee_id: int):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+@app.get("/analytics")
+def get_dashboard_analytics(peer_weight: float = 0.4, manager_weight: float = 0.6):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # JOIN the tables to get the Name, Role, and Retention Risk alongside the scores
+        cursor.execute('''
+            SELECT c.employeeid, c.fullname, c.jobrole, c.retentionriskscore, 
+                   p.peerfeedbackscore, p.managerfeedbackscore, p.trainingrecommended 
+            FROM Consultants c
+            LEFT JOIN PerformanceAppraisals p ON c.employeeid = p.employeeid;
+        ''')
+        rows = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        
+        team_data = []
+        for row in rows:
+            emp_id, name, role, risk_score, peer, manager, training = row
+            
+            # Handle empty values just in case an employee hasn't been reviewed yet
+            peer = peer or 0
+            manager = manager or 0
+            risk_score = risk_score or 0.0
+            
+            final_score = (peer * peer_weight) + (manager * manager_weight)
+            
+            team_data.append({
+                "employee_id": emp_id,
+                "name": name,
+                "role": role,
+                "appraisal_score": round(final_score, 2),
+                "retention_risk_percent": int(risk_score * 100),
+                "suggested_track": training or "Pending Review"
+            })
+            
+        return {"team_analytics": team_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
